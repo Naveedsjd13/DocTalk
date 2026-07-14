@@ -19,6 +19,26 @@ const documentSchema = new mongoose.Schema(
       enum: ["processing", "ready", "failed"],
       default: "processing",
     },
+    isStarred: {
+      type: Boolean,
+      default: false,
+    },
+    isTrashed: {
+      type: Boolean,
+      default: false,
+    },
+    trashedAt: {
+      type: Date,
+      default: null,
+    },
+    lastOpenedAt: {
+      type: Date,
+      default: null,
+    },
+    gridfsFileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
   },
   { timestamps: true }
 );

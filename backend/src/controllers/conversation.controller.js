@@ -3,7 +3,7 @@ const Message = require("../models/Message");
 const Document = require("../models/Document");
 const { embedText } = require("../services/embedding.service");
 const { searchChunks } = require("../services/retrieval.service");
-const { generateAnswer } = require("../services/llm.service");
+const { streamAnswer, NO_CONTEXT_ANSWER } = require("../services/llm.service");
 
 const createConversation = async (req, res) => {
   try {
@@ -104,7 +104,6 @@ const sendMessage = async (req, res) => {
 
     const questionEmbedding = await embedText(question);
     const matchedChunks = await searchChunks(documentId, questionEmbedding);
-    const answer = await generateAnswer(question, matchedChunks);
 
     const citations = matchedChunks.map((chunk) => ({
       pageNumber: chunk.pageNumber,
@@ -112,10 +111,32 @@ const sendMessage = async (req, res) => {
       score: chunk.score,
     }));
 
+    // Set SSE headers
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    let fullAnswer = "";
+
+    try {
+      const stream = streamAnswer(question, matchedChunks);
+
+      for await (const textChunk of stream) {
+        fullAnswer += textChunk;
+        res.write(`data: ${JSON.stringify({ content: textChunk })}\n\n`);
+      }
+    } catch (streamError) {
+      res.write(`data: ${JSON.stringify({ error: streamError.message })}\n\n`);
+      // If nothing was streamed yet, use the partial answer or a fallback
+      if (!fullAnswer) fullAnswer = "An error occurred while generating the answer.";
+    }
+
+    // Save the complete assistant message
     await Message.create({
       conversationId: conversation._id,
       role: "assistant",
-      content: answer,
+      content: fullAnswer,
       citations,
     });
 
@@ -123,9 +144,17 @@ const sendMessage = async (req, res) => {
     conversation.updatedAt = new Date();
     await conversation.save();
 
-    res.json({ question, answer, matchedChunks });
+    // Send completion signal
+    res.write(`data: ${JSON.stringify({ done: true, matchedChunks })}\n\n`);
+    res.end();
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    // If headers haven't been sent yet, fall back to JSON error response
+    if (!res.headersSent) {
+      return res.status(500).json({ message: error.message });
+    }
+    // If headers are already sent (mid-stream), send error event and close
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.end();
   }
 };
 
