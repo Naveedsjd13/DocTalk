@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const TokenBlocklist = require("../models/TokenBlocklist");
 
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
   const header = req.headers.authorization;
 
   if (!header || !header.startsWith("Bearer ")) {
@@ -11,7 +12,14 @@ const auth = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const revoked = await TokenBlocklist.findOne({ jti: decoded.jti });
+    if (revoked) {
+      return res.status(401).json({ message: "Token has been revoked" });
+    }
+
     req.user = decoded;
+    req.token = token;
     next();
   } catch (error) {
     return res.status(401).json({ message: "Unauthorized" });

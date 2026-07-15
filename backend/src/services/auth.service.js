@@ -1,4 +1,5 @@
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 
 const SALT_ROUNDS = 10;
@@ -13,7 +14,8 @@ const comparePassword = async (password, passwordHash) => {
 };
 
 const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+  const jti = crypto.randomUUID();
+  return jwt.sign({ id: userId, jti }, process.env.JWT_SECRET, {
     expiresIn: TOKEN_EXPIRY,
   });
 };
