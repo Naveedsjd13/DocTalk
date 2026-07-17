@@ -12,6 +12,7 @@ const authRoutes = require("./routes/auth.routes");
 const documentRoutes = require("./routes/document.routes");
 const conversationRoutes = require("./routes/conversation.routes");
 const healthRoutes = require("./routes/health.routes");
+const billingRoutes = require("./routes/billing.routes");
 const errorHandler = require("./middleware/error.middleware");
 
 const app = express();
@@ -36,6 +37,7 @@ app.use("/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/billing", billingRoutes);
 
 app.use(errorHandler);
 

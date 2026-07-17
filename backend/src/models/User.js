@@ -23,6 +23,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    plan: {
+      type: String,
+      enum: ["free", "pro"],
+      default: "free",
+    },
+    questionsUsedThisMonth: {
+      type: Number,
+      default: 0,
+    },
+    usageResetAt: {
+      type: Date,
+      default: () => new Date(),
+    },
   },
   { timestamps: true }
 );
