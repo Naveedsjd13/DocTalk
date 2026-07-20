@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Outlet, Link } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./lib/theme";
+import { AuthProvider } from "./lib/auth-context";
 import LandingPage from "./routes/index";
 import LoginPage from "./routes/login";
 import SignupPage from "./routes/signup";
@@ -42,21 +43,23 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/" element={<AppLayout />}>
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="recent" element={<RecentPage />} />
-              <Route path="starred" element={<StarredPage />} />
-              <Route path="trash" element={<TrashPage />} />
-              <Route path="upload" element={<UploadPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="documents/:id" element={<DocumentChat />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/" element={<AppLayout />}>
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="recent" element={<RecentPage />} />
+                <Route path="starred" element={<StarredPage />} />
+                <Route path="trash" element={<TrashPage />} />
+                <Route path="upload" element={<UploadPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="documents/:id" element={<DocumentChat />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>
     </QueryClientProvider>

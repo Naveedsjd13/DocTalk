@@ -1,22 +1,30 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { AuthShell, FieldLabel, TextInput, PrimaryButton } from "@/components/auth-shell";
+import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
-  const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const next = {};
     if (!/^\S+@\S+\.\S+$/.test(email)) next.email = "Enter a valid email address.";
     if (password.length < 6) next.password = "Password must be at least 6 characters.";
     setErrors(next);
-    if (Object.keys(next).length === 0) {
-      // TODO: wire to auth backend
-      navigate("/dashboard");
+    if (Object.keys(next).length > 0) return;
+
+    setSubmitting(true);
+    try {
+      await login(email, password);
+    } catch (err) {
+      setErrors({ form: err.message });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -34,6 +42,9 @@ export default function LoginPage() {
       }
     >
       <form onSubmit={submit} className="space-y-4" noValidate>
+        {errors.form && (
+          <p className="text-sm text-destructive">{errors.form}</p>
+        )}
         <label className="block">
           <FieldLabel>Email</FieldLabel>
           <TextInput
@@ -63,7 +74,9 @@ export default function LoginPage() {
             required
           />
         </label>
-        <PrimaryButton type="submit">Log in</PrimaryButton>
+        <PrimaryButton type="submit" disabled={submitting}>
+          {submitting ? "Logging in..." : "Log in"}
+        </PrimaryButton>
       </form>
     </AuthShell>
   );
