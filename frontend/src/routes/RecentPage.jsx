@@ -1,6 +1,8 @@
 import { TopBar } from "@/components/top-bar";
 import { DocCard } from "@/components/doc-card";
-import { mockDocs } from "@/lib/mock-docs";
+import { documentsApi } from "@/lib/documents";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Search, LayoutGrid, List } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -16,13 +18,35 @@ export default function RecentPage() {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("recent");
   const [view, setView] = useState("grid");
+  const queryClient = useQueryClient();
 
-  const docs = useMemo(() => {
-    let list = mockDocs.filter((d) => !d.trashed);
+  const { data: docs = [], isLoading } = useQuery({
+    queryKey: ["documents", "recent"],
+    queryFn: () => documentsApi.list("recent"),
+  });
+
+  const toggleStar = useMutation({
+    mutationFn: (id) => {
+      const doc = docs.find((d) => d._id === id);
+      return documentsApi.update(id, { isStarred: !doc.isStarred });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
+  });
+
+  const trashDoc = useMutation({
+    mutationFn: (id) => documentsApi.trash(id),
+    onSuccess: () => {
+      toast.success("Moved to trash");
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+
+  const filteredDocs = useMemo(() => {
+    let list = docs.filter((d) => !d.isTrashed);
     if (q) list = list.filter((d) => d.title.toLowerCase().includes(q.toLowerCase()));
     if (sort === "name") list = [...list].sort((a, b) => a.title.localeCompare(b.title));
     return list;
-  }, [q, sort]);
+  }, [docs, q, sort]);
 
   return (
     <>
@@ -46,7 +70,6 @@ export default function RecentPage() {
             <SelectContent>
               <SelectItem value="recent">Last opened</SelectItem>
               <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="size">Size</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex overflow-hidden rounded-md border border-border">
@@ -67,14 +90,25 @@ export default function RecentPage() {
           </div>
         </div>
 
-        {docs.length === 0 ? (
+        {isLoading ? (
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((n) => (
+              <div key={n} className="h-40 animate-pulse rounded-xl border border-border bg-card" />
+            ))}
+          </div>
+        ) : filteredDocs.length === 0 ? (
           <div className="mt-16 rounded-2xl border border-dashed border-border p-16 text-center text-sm text-muted-foreground">
             No documents match your search.
           </div>
         ) : view === "grid" ? (
           <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {docs.map((d) => (
-              <DocCard key={d.id} doc={d} />
+            {filteredDocs.map((d) => (
+              <DocCard
+                key={d._id}
+                doc={d}
+                onToggleStar={(id) => toggleStar.mutate(id)}
+                onTrash={(id) => trashDoc.mutate(id)}
+              />
             ))}
           </div>
         ) : (
@@ -82,17 +116,19 @@ export default function RecentPage() {
             <div className="grid grid-cols-[1fr_120px_100px_60px] gap-4 border-b border-border px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               <div>Name</div>
               <div className="hidden sm:block">Last opened</div>
-              <div className="hidden sm:block">Size</div>
+              <div className="hidden sm:block">Pages</div>
               <div />
             </div>
-            {docs.map((d) => (
+            {filteredDocs.map((d) => (
               <div
-                key={d.id}
+                key={d._id}
                 className="grid grid-cols-[1fr_120px_100px_60px] items-center gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-accent/40"
               >
                 <div className="min-w-0 truncate text-sm font-medium text-foreground">{d.title}</div>
-                <div className="hidden text-xs text-muted-foreground sm:block">{d.lastOpened}</div>
-                <div className="hidden text-xs text-muted-foreground sm:block">{d.size}</div>
+                <div className="hidden text-xs text-muted-foreground sm:block">
+                  {d.lastOpenedAt ? new Date(d.lastOpenedAt).toLocaleDateString() : "—"}
+                </div>
+                <div className="hidden text-xs text-muted-foreground sm:block">{d.pageCount ?? "—"} pages</div>
                 <div />
               </div>
             ))}

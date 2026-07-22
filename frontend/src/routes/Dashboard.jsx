@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 import { TopBar } from "@/components/top-bar";
 import { DocCard } from "@/components/doc-card";
-import { mockDocs } from "@/lib/mock-docs";
+import { documentsApi } from "@/lib/documents";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Upload, FileText, HardDrive, MessageSquare, Plus } from "lucide-react";
 
 function StatCard({ icon: Icon, label, value }) {
@@ -19,7 +21,30 @@ function StatCard({ icon: Icon, label, value }) {
 }
 
 export default function Dashboard() {
-  const docs = mockDocs.filter((d) => !d.trashed).slice(0, 6);
+  const queryClient = useQueryClient();
+
+  const { data: docs = [], isLoading } = useQuery({
+    queryKey: ["documents"],
+    queryFn: () => documentsApi.list(),
+  });
+
+  const toggleStar = useMutation({
+    mutationFn: (id) => {
+      const doc = docs.find((d) => d._id === id);
+      return documentsApi.update(id, { isStarred: !doc.isStarred });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
+  });
+
+  const trashDoc = useMutation({
+    mutationFn: (id) => documentsApi.trash(id),
+    onSuccess: () => {
+      toast.success("Moved to trash");
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+
+  const recentDocs = docs.filter((d) => !d.isTrashed).slice(0, 6);
 
   return (
     <>
@@ -28,7 +53,7 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Welcome back, Naveed
+              Welcome back
             </h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
               Pick up where you left off or start a new conversation.
@@ -44,12 +69,23 @@ export default function Dashboard() {
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <StatCard icon={FileText} label="Documents" value="24" />
-          <StatCard icon={HardDrive} label="Storage used" value="128 MB" />
-          <StatCard icon={MessageSquare} label="Questions this month" value="312" />
+          <StatCard icon={FileText} label="Documents" value={isLoading ? "—" : docs.filter((d) => !d.isTrashed).length} />
+          <StatCard icon={HardDrive} label="Storage used" value="—" />
+          <StatCard icon={MessageSquare} label="Questions this month" value="—" />
         </div>
 
-        {docs.length > 0 ? (
+        {isLoading ? (
+          <section className="mt-10">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold tracking-tight text-foreground">Recent documents</h2>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="h-40 animate-pulse rounded-xl border border-border bg-card" />
+              ))}
+            </div>
+          </section>
+        ) : recentDocs.length > 0 ? (
           <section className="mt-10">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight text-foreground">Recent documents</h2>
@@ -58,8 +94,13 @@ export default function Dashboard() {
               </Link>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {docs.map((d) => (
-                <DocCard key={d.id} doc={d} />
+              {recentDocs.map((d) => (
+                <DocCard
+                  key={d._id}
+                  doc={d}
+                  onToggleStar={(id) => toggleStar.mutate(id)}
+                  onTrash={(id) => trashDoc.mutate(id)}
+                />
               ))}
             </div>
           </section>
